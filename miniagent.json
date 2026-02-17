@@ -1,0 +1,25 @@
+{
+  "provider": "ollama",
+  "ollama": {
+    "endpoint": "http://localhost:11434",
+    "model": "qwen2.5:7b"
+  },
+  "openai": {
+    "endpoint": "https://api.openai.com/v1",
+    "model": "gpt-4o-mini",
+    "apiKey": "your_api_key"
+  },
+  "skills": {
+    "extraDirs": [],
+    "entries": {
+      "pcmiler": {
+        "authToken": "your_auth_token",
+        "baseUrl": "https://pcmiler.alk.com/apis/rest/v1.0/Service.svc"
+      }
+    }
+  },
+  "agent": {
+    "timeoutSeconds": 300,
+    "maxToolRounds": 10
+  }
+}
