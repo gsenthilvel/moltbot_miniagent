@@ -14,14 +14,20 @@ Be concise and accurate. If a tool fails, explain what went wrong and suggest a 
     public string Build(IReadOnlyList<Skill> skills, IReadOnlyList<LlmMessage> sessionMessages, IReadOnlyList<ToolDefinition> tools)
     {
         var sb = new StringBuilder(BasePrompt);
+
+        var lastUserMessage = sessionMessages
+            .LastOrDefault(m => m.Role == "user")?.Content ?? "";
+
+        var relevantSkills = RankSkills(skills, lastUserMessage);
+
         sb.AppendLine("\n\n## Available skills\n");
-        foreach (var s in skills)
+        foreach (var (skill, includeInstructions) in relevantSkills)
         {
-            sb.AppendLine($"<skill name=\"{EscapeXml(s.Name)}\" description=\"{EscapeXml(s.Description)}\" location=\"{EscapeXml(s.Location)}\"/>");
-            if (!string.IsNullOrWhiteSpace(s.Instructions))
+            sb.AppendLine($"<skill name=\"{EscapeXml(skill.Name)}\" description=\"{EscapeXml(skill.Description)}\"/>");
+            if (includeInstructions && !string.IsNullOrWhiteSpace(skill.Instructions))
             {
                 sb.AppendLine();
-                sb.AppendLine(s.Instructions.Trim());
+                sb.AppendLine(skill.Instructions.Trim());
                 sb.AppendLine();
             }
         }
@@ -29,6 +35,34 @@ Be concise and accurate. If a tool fails, explain what went wrong and suggest a 
         foreach (var t in tools)
             sb.AppendLine($"- {t.Name}: {t.Description}");
         return sb.ToString();
+    }
+
+    private static List<(Skill skill, bool includeInstructions)> RankSkills(
+        IReadOnlyList<Skill> skills, string userMessage)
+    {
+        var msg = userMessage.ToLowerInvariant();
+        var result = new List<(Skill, bool)>();
+        foreach (var s in skills)
+        {
+            var nameMatch = msg.Contains(s.Name.ToLowerInvariant());
+            var descWords = s.Description.ToLowerInvariant()
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var descMatch = descWords.Count(w => w.Length > 3 && msg.Contains(w)) >= 2;
+
+            var keywords = ExtractKeywords(s.Name);
+            var keywordMatch = keywords.Any(k => msg.Contains(k));
+
+            var isRelevant = nameMatch || descMatch || keywordMatch;
+            result.Add((s, isRelevant));
+        }
+        return result;
+    }
+
+    private static string[] ExtractKeywords(string skillName)
+    {
+        var parts = skillName.ToLowerInvariant()
+            .Split('-', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Where(p => p.Length > 3 && p != "mapbox" && p != "patterns").ToArray();
     }
 
     private static string EscapeXml(string s)
